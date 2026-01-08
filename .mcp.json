@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "context7": {
+      "url": "https://mcp.context7.com/mcp",
+      "headers": {
+        "CONTEXT7_API_KEY": "ctx7sk-06e0410a-63cb-4a73-9f2f-7facf8bbb009"
+      }
+    },
+    "tavily-remote-mcp": {
+      "command": "npx -y mcp-remote https://mcp.tavily.com/mcp/?tavilyApiKey=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",
+      "env": {}
+    }
+  }
+}
