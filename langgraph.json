@@ -1,0 +1,8 @@
+{
+  "dependencies": ["./report_generator_langgraph", "./html_page_modifier_langgraph"],
+  "graphs": {
+    "report_generator_langgraph": "./report_generator_langgraph:graph",
+    "html_page_modifier_langgraph": "./html_page_modifier_langgraph:graph"
+  },
+  "env": ".env"
+}

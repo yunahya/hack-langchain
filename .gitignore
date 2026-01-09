@@ -2,3 +2,4 @@
 .mcp.json
 .venv
 /notebooks/test-files/*
+.langgraph_api

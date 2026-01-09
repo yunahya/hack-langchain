@@ -18,11 +18,12 @@ LangGraph-based business report generation workflow featuring:
 - **Multi-LLM Support**: Gemini (default) and Azure OpenAI
 
 ### `html_page_modifier.ipynb`
-LangGraph-based single HTML page modification workflow:
+Interactive notebook for LangGraph-based HTML page modification:
 - **Single Page Focus**: One HTML page in, one modified HTML page out
 - **AI-Powered Modification**: Modifies HTML based on user request
 - **Design Changes**: Layout, colors, spacing, structure modifications
 - **Multi-LLM Support**: Gemini (default) and Azure OpenAI
+- **Package Equivalent**: See `html_page_modifier_langgraph/` for production package
 
 #### Architecture
 ```
@@ -31,14 +32,20 @@ START -> modify_page_html -> END
 
 #### State Schema
 ```python
+PageModificationInput:
+  - html_content: str     # Current HTML to modify
+  - user_request: str     # Natural language request
+  - page_id: str          # Page identifier
+  - page_order: int       # Page order number
+
 PageModificationState:
-  - input: PageModificationInput  # html_content, user_request, page_id, page_order
+  - input: PageModificationInput
   - modified_html: str            # Output HTML
   - modification_summary: str     # Brief change description
-  - status: str                   # Workflow status
+  - status: str                   # 'pending' | 'completed'
 ```
 
-#### Quick Usage
+#### Quick Usage (Notebook)
 ```python
 result = modify_html(
     html_content="<div>...</div>",
@@ -48,6 +55,11 @@ result = modify_html(
 )
 # result["modified_html"] contains the updated HTML
 ```
+
+#### Output Files
+Test results are saved to `test-files/` directory:
+- `{page_id}_original.html` - Original HTML
+- `{page_id}_modified.html` - Modified HTML
 
 ---
 
