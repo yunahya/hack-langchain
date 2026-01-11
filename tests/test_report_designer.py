@@ -16,20 +16,27 @@ import json
 import asyncio
 
 # Import the module under test
-from report_designer.graph import (
+from report_designer.state import (
     DesignRequirement,
-    Section,
     DesignedPage,
     ReportDesignState,
+    Section,
     SectionPayload,
+)
+from report_designer.utils import (
+    DEFAULT_LLM_CONFIGS,
     LLMConfig,
-    extract_text_content,
     extract_body_blocks,
-    prepare_sections,
+    extract_text_content,
+)
+from report_designer.graph import (
     combine_results,
     fan_out_to_sections,
-    LLM_CONFIGS,
+    prepare_sections,
 )
+
+# Alias for backward compatibility in tests
+LLM_CONFIGS = DEFAULT_LLM_CONFIGS
 
 
 # =============================================================================
