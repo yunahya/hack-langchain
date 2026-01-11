@@ -5,6 +5,7 @@
 This directory contains Jupyter notebooks for **LangGraph Business Workflows**:
 1. **Report Generator**: Automated business report generation with parallel page creation
 2. **HTML Page Modifier**: AI-powered single page HTML modification
+3. **Report Design Workflow**: AI-powered Sustainability Report HTML design (migrated from Dify)
 
 ---
 
@@ -16,6 +17,23 @@ LangGraph-based business report generation workflow featuring:
 - **Parallel Page Generation**: Uses `Send` API for concurrent content creation
 - **A4 Optimization**: 800-1200 characters per page (Korean)
 - **Multi-LLM Support**: Gemini (default) and Azure OpenAI
+
+### `report_designer.ipynb`
+LangGraph-based AI report design workflow (migrated from Dify).
+
+**Note**: Core workflow logic is available in the `report_designer` package at project root.
+See `report_designer/` for the reusable module implementation.
+
+#### Quick Usage
+```python
+from report_designer import run_report_design_workflow
+
+result = await run_report_design_workflow(
+    api_url="https://gen-api.i-esg.io",
+    token="your_token",
+    report_id="your_report_id"
+)
+```
 
 ### `html_page_modifier.ipynb`
 Interactive notebook for LangGraph-based HTML page modification:
@@ -126,11 +144,13 @@ OPENAI_API_VERSION=2024-08-01-preview
 - **LLM Response Format**: Gemini returns list content; use `extract_text_content()`
 - **Missing API Keys**: Check `.env` file configuration
 
-## Running the Notebook
+## Running Notebooks
 
 ```bash
 # With uv (recommended)
 uv run jupyter notebook notebooks/report_generator.ipynb
+uv run jupyter notebook notebooks/report_designer.ipynb
+uv run jupyter notebook notebooks/html_page_modifier.ipynb
 
 # With pip
 jupyter notebook notebooks/report_generator.ipynb
