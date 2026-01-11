@@ -5,7 +5,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 ## Project Overview
 
 LangGraph-based business report automation workflows with three main components:
-1. **Report Designer** (`report_designer/`) - Business report HTML design workflow package
+1. **Report Designer** (`report_designer_langgraph/`) - Business report HTML design workflow package
 2. **Jupyter Notebooks** (`notebooks/`) - Interactive workflows for report generation and HTML modification
 3. **ReAct Agent Template** (`langgraph-template/`) - A reference implementation of a tool-calling agent
 
@@ -33,7 +33,7 @@ uv run pytest tests/ -v
 
 # Run single test file
 uv run pytest tests/test_report_generator.py -v
-uv run pytest tests/test_report_designer.py -v
+uv run pytest tests/test_report_designer_langgraph.py -v
 
 # Run specific test class
 uv run pytest tests/test_report_generator.py::TestTOCGeneration -v
@@ -58,7 +58,7 @@ START -> modify_page_html -> END
 ```
 Simple single-node workflow for AI-powered HTML modifications with design constraints.
 
-### Report Designer Package (`report_designer/`)
+### Report Designer Package (`report_designer_langgraph/`)
 ```
 START -> fetch_all_data -> prepare_sections
       -> [fan_out] -> design_section (×N parallel)

@@ -30,7 +30,7 @@ langgraph dev
 python -m report_generator_langgraph.graph
 
 # Report Designer
-python -m report_designer.graph
+python -m report_designer_langgraph.graph
 
 # HTML Page Modifier
 python -m html_page_modifier_langgraph.graph
@@ -43,7 +43,7 @@ python -m html_page_modifier_langgraph.graph
 ```
 hack-langchain/
 ├── report_generator_langgraph/     # 비즈니스 보고서 생성 워크플로우
-├── report_designer/                # 비즈니스 보고서 HTML 디자인 워크플로우
+├── report_designer_langgraph/      # 비즈니스 보고서 HTML 디자인 워크플로우
 ├── html_page_modifier_langgraph/   # HTML 페이지 수정 워크플로우
 ├── langgraph-template/             # React Agent 템플릿
 ├── notebooks/                      # Jupyter 노트북 (프로토타입)
@@ -148,7 +148,7 @@ result = graph.invoke(initial_state, config=config)
 
 ---
 
-## 2. Report Designer (`report_designer/`)
+## 2. Report Designer (`report_designer_langgraph/`)
 
 ### 목적
 비즈니스 보고서의 HTML 디자인을 자동으로 생성합니다. API에서 보고서 데이터를 가져와 각 섹션을 병렬로 디자인하고, 최종 결과를 발행합니다.
@@ -212,7 +212,7 @@ START → fetch_all_data → prepare_sections → [fan_out/Send()] → design_se
 ### 사용 예시
 
 ```python
-from report_designer import run_report_design_workflow
+from report_designer_langgraph import run_report_design_workflow
 
 result = await run_report_design_workflow(
     api_url="https://api.example.com",

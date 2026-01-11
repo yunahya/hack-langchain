@@ -21,12 +21,12 @@ LangGraph-based business report generation workflow featuring:
 ### `report_designer.ipynb`
 LangGraph-based AI report design workflow (migrated from Dify).
 
-**Note**: Core workflow logic is available in the `report_designer` package at project root.
-See `report_designer/` for the reusable module implementation.
+**Note**: Core workflow logic is available in the `report_designer_langgraph` package at project root.
+See `report_designer_langgraph/` for the reusable module implementation.
 
 #### Quick Usage
 ```python
-from report_designer import run_report_design_workflow
+from report_designer_langgraph import run_report_design_workflow
 
 result = await run_report_design_workflow(
     api_url="https://gen-api.i-esg.io",

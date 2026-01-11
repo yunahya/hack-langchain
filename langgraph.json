@@ -2,12 +2,12 @@
   "dependencies": [
     "./report_generator_langgraph",
     "./html_page_modifier_langgraph",
-    "./report_designer"
+    "./report_designer_langgraph"
   ],
   "graphs": {
     "report_generator_langgraph": "./report_generator_langgraph:graph",
     "html_page_modifier_langgraph": "./html_page_modifier_langgraph:graph",
-    "report_designer": "./report_designer:report_design_graph"
+    "report_designer_langgraph": "./report_designer_langgraph:report_design_graph"
   },
   "env": ".env"
 }
