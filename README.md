@@ -3,6 +3,7 @@
 LangGraph 기반 비즈니스 워크플로우 모음
 
 - **Report Generator**: 비즈니스 보고서 자동 생성 (병렬 페이지 생성)
+- **Report Designer**: 비즈니스 보고서 HTML 디자인 (병렬 섹션 디자인)
 - **HTML Page Modifier**: AI 기반 HTML 페이지 수정
 - **React Agent Template**: 도구 호출 에이전트 템플릿
 
@@ -28,6 +29,9 @@ langgraph dev
 # Report Generator
 python -m report_generator_langgraph.graph
 
+# Report Designer
+python -m report_designer.graph
+
 # HTML Page Modifier
 python -m html_page_modifier_langgraph.graph
 ```
@@ -39,6 +43,7 @@ python -m html_page_modifier_langgraph.graph
 ```
 hack-langchain/
 ├── report_generator_langgraph/     # 비즈니스 보고서 생성 워크플로우
+├── report_designer/                # 비즈니스 보고서 HTML 디자인 워크플로우
 ├── html_page_modifier_langgraph/   # HTML 페이지 수정 워크플로우
 ├── langgraph-template/             # React Agent 템플릿
 ├── notebooks/                      # Jupyter 노트북 (프로토타입)
@@ -143,7 +148,101 @@ result = graph.invoke(initial_state, config=config)
 
 ---
 
-## 2. HTML Page Modifier (`html_page_modifier_langgraph/`)
+## 2. Report Designer (`report_designer/`)
+
+### 목적
+비즈니스 보고서의 HTML 디자인을 자동으로 생성합니다. API에서 보고서 데이터를 가져와 각 섹션을 병렬로 디자인하고, 최종 결과를 발행합니다.
+
+### 워크플로우
+
+```
+START → fetch_all_data → prepare_sections → [fan_out/Send()] → design_section (×N 병렬) → combine_results → publish_report → END
+```
+
+| 노드 | 설명 |
+|------|------|
+| `fetch_all_data` | API에서 디자인 요구사항, 아웃라인, 메타데이터 병렬 fetch |
+| `prepare_sections` | 아웃라인에서 섹션 배열 추출 |
+| `design_section` | 개별 섹션 HTML 디자인 (Send API로 병렬 처리, 3단계 LLM 폴백) |
+| `combine_results` | 디자인된 페이지들을 정렬 및 재인덱싱 |
+| `publish_report` | API에 최종 결과 발행 (PATCH) |
+
+### 모듈 구조
+
+| 파일 | 역할 |
+|------|------|
+| `__init__.py` | 패키지 exports (graph, state types, utilities) |
+| `state.py` | 상태 스키마 정의 (ReportDesignState, Section, DesignedPage 등) |
+| `graph.py` | LangGraph 워크플로우 정의 및 노드 함수 |
+| `prompts.py` | PromptManager 및 Jinja2 템플릿 렌더링 |
+| `prompts/` | Jinja2 프롬프트 템플릿 디렉토리 |
+| `context.py` | 런타임 Configuration 클래스 |
+| `utils.py` | LLM 설정, 폴백 체인, 헬퍼 함수 |
+
+### 인풋 스키마
+
+#### 워크플로우 입력 (ReportDesignState)
+
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `api_url` | str | API 베이스 URL |
+| `token` | str | Bearer 인증 토큰 |
+| `report_id` | str | 보고서 식별자 |
+
+#### API 응답 스키마
+
+**DesignRequirement** (from `/customization/{report_id}`):
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `primary_color` | str | 메인 브랜드 색상 (예: "#1E40AF") |
+| `secondary_color` | str | 보조 색상 |
+| `accent_color` | str | 강조 색상 |
+| `pdf_orientation` | str | "portrait" 또는 "landscape" |
+
+**Section** (from `/document-outlines/{report_id}`):
+| 필드 | 타입 | 설명 |
+|------|------|------|
+| `order` | int | 정렬 순서 |
+| `section_title` | str | 표시 제목 |
+| `section_number` | str | 섹션 번호 (예: "1.0", "2.1") |
+| `section_key` | str | 레이아웃 결정용 키 (예: "EXECUTIVE_SUMMARY") |
+| `content` | str | 마크다운/HTML 콘텐츠 |
+| `parent_path` | str | 브레드크럼 경로 |
+
+### 사용 예시
+
+```python
+from report_designer import run_report_design_workflow
+
+result = await run_report_design_workflow(
+    api_url="https://api.example.com",
+    token="your_token_here",
+    report_id="report-123"
+)
+
+print(f"Status: {result['status']}")
+print(f"Pages: {len(result['designed_pages'])}")
+```
+
+### LLM 폴백 체인
+
+3단계 폴백으로 안정성 보장:
+1. **Primary**: `gemini-2.0-flash`
+2. **Retry**: `gemini-2.0-flash`
+3. **Fallback**: `gemini-1.5-pro`
+
+### API 엔드포인트
+
+| 메서드 | 엔드포인트 | 설명 |
+|--------|------------|------|
+| GET | `/customization/{report_id}` | 디자인 요구사항 조회 |
+| GET | `/document-outlines/{report_id}` | 섹션 아웃라인 조회 |
+| GET | `/reports/{report_id}` | 보고서 메타데이터 조회 |
+| PATCH | `/reports/{report_id}/publish-content` | 디자인 결과 발행 |
+
+---
+
+## 3. HTML Page Modifier (`html_page_modifier_langgraph/`)
 
 ### 목적
 단일 HTML 페이지를 자연어 요청에 따라 수정합니다. 디자인, 레이아웃, 색상, 구조 변경을 지원합니다.
@@ -225,7 +324,7 @@ result = graph.invoke(initial_state, config=config)
 
 ---
 
-## 3. React Agent Template (`langgraph-template/`)
+## 4. React Agent Template (`langgraph-template/`)
 
 ### 목적
 도구 호출(Tool Calling)을 지원하는 ReAct 에이전트 템플릿입니다. 사용자 질문에 대해 도구를 선택하고 실행하는 루프를 수행합니다.
@@ -274,19 +373,22 @@ print(result["messages"][-1].content)
 
 ---
 
-## 4. Notebooks (`notebooks/`)
+## 5. Notebooks (`notebooks/`)
 
 프로토타입 및 실험용 Jupyter 노트북
 
 | 파일 | 설명 |
 |------|------|
 | `report_generator.ipynb` | Report Generator 프로토타입 |
+| `report_designer.ipynb` | Report Designer 프로토타입 (Mock 데이터 테스트, HTML 렌더링) |
 | `html_page_modifier.ipynb` | HTML Page Modifier 프로토타입 |
 
 ### 실행 방법
 
 ```bash
 uv run jupyter notebook notebooks/report_generator.ipynb
+uv run jupyter notebook notebooks/report_designer.ipynb
+uv run jupyter notebook notebooks/html_page_modifier.ipynb
 ```
 
 ---
