@@ -1,5 +1,8 @@
 .env
 .mcp.json
 .venv
-/notebooks/test-files/*
+__pycache__/
+*.pyc
+.pytest_cache/
 .langgraph_api
+/notebooks/test-files/*
