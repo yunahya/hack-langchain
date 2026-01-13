@@ -1,0 +1,1159 @@
+<core_rules>
+## 핵심 규칙 (Single Source of Truth)
+
+### 1. 절대 금지 사항 (Absolute Constraints)
+
+다음 사항은 어떤 상황에서도 위반하지 마십시오:
+
+**구조 관련:**
+- ❌ `<!DOCTYPE html>`, `<html>`, `<head>`, `<style>` 태그 사용 금지
+- ❌ `<div class="pdf-footer">` 또는 Page 번호 직접 구현 금지 (PdfPage가 자동 추가)
+- ❌ 코드 블록(```)으로 감싸기 금지
+- ❌ HTML 주석 사용 금지
+- ❌ **이모지, 이모티콘 사용 금지**
+
+**레이아웃 관련:**
+- ❌ `position: absolute` 사용 금지 (텍스트, 차트, 통계 수치, 아이콘 배치 시) - 장식용 배경(z-index: -1)만 예외
+- ❌ 최상위 div에 `height: 100%` 사용 금지
+- ❌ 최상위 div에 `justify-content: center` 사용 금지 (세로 중앙 정렬 금지)
+- ❌ `overflow-y: auto`, `overflow-x: auto` 사용 금지 (스크롤 생성 금지)
+- ❌ `margin`, `margin-top`, `margin-bottom` 사용 금지 (flex + gap 사용)
+- ❌ 숫자, 문자, 텍스트에 `<div>` 태그 사용 금지 (`<p>`, `<span>`, `<h1>`~`<h6>` 사용)
+
+**이미지 관련:**
+- ❌ 제공된 이미지를 `background-image`로 사용 금지 (`<img>` 태그 사용)
+
+### 2. 필수 속성 (Required Attributes)
+
+**모든 출력에 반드시 적용:**
+- ✅ 모든 텍스트 요소에 `word-break: keep-all` (한글 단어 단위 줄바꿈)
+- ✅ 모든 배치에 Flexbox(`display: flex`) 또는 Grid(`display: grid`) 사용
+- ✅ 모든 `<img>` 태그에 `max-width: 100%; max-height: 400px; object-fit: contain; display: block;`
+- ✅ 모든 주요 컨테이너에 `box-sizing: border-box;`
+- ✅ 가로 배치 요소에 `flex-wrap: wrap;` (넘침 방지)
+- ✅ 최상위 div 외 나머지 div에는 `height: auto;` 사용
+
+### 3. 출력 구조 (Output Structure)
+
+**PdfPage 컴포넌트가 자동으로 제공하는 요소들:**
+```html
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8">
+    <style>
+      * { margin: 0; padding: 0; box-sizing: border-box; }
+      html, body {
+        width: 794px;  /* or 1123px for landscape */
+        height: 1123px; /* or 794px for landscape */
+        overflow: hidden;
+      }
+    </style>
+  </head>
+  <!-- 여기에 당신이 생성한 <body> 삽입 -->
+  <div class="pdf-footer">
+    <div>{reportTitle}</div>
+    <div>Page {pageNumber}</div>
+  </div>
+</html>
+```
+**→ 위 요소들은 PdfPage가 자동 제공하므로 절대 생성하지 마십시오.**
+
+**PdfPage 컴포넌트 컨텍스트:**
+{% if design_requirement.pdf_orientation == "landscape" %}
+- 전체 페이지: 1123px × 794px
+- Footer 공간: 50px (PdfPage가 자동 추가)
+- 이론적 콘텐츠 영역: 744px
+- **Safe Zone 타겟: 744px 이하** (렌더링 오차 고려)
+- 콘텐츠 영역 너비: 1003px (padding 60px × 2 제외)
+{% else %}
+- 전체 페이지: 794px × 1123px
+- Footer 공간: 50px (PdfPage가 자동 추가)
+- 이론적 콘텐츠 영역: 1073px
+- **Safe Zone 타겟: 1073px 이하** (렌더링 오차 고려)
+- 콘텐츠 영역 너비: 674px (padding 60px × 2 제외)
+{% endif %}
+
+**반드시 다음 구조를 따르십시오:**
+
+{% if design_requirement.pdf_orientation == "landscape" %}
+```html
+<body style="margin: 0; overflow: hidden;">
+  <div style="padding: 60px; word-break: keep-all; height: 744px; overflow: hidden; box-sizing: border-box; display: flex;">
+    <!-- 모든 콘텐츠 -->
+  </div>
+</body>
+```
+{% else %}
+```html
+<body style="margin: 0; overflow: hidden;">
+  <div style="padding: 60px; word-break: keep-all; height: 1073px; overflow: hidden; box-sizing: border-box; display: flex;">
+    <!-- 모든 콘텐츠 -->
+  </div>
+</body>
+```
+{% endif %}
+
+**구조 규칙:**
+- 첫 번째 줄: 반드시 `<body style="margin: 0; overflow: hidden;">`
+- 마지막 줄: 반드시 `</body>`
+- body에 width, height 속성 금지 (PdfPage가 제공)
+
+{% if content_length >= 1000 %}
+### 4. 다중 페이지 규칙 ({{ content_length }}자 - 필수)
+
+**페이지 분할 필수:**
+- 필수 페이지 수: {{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지
+- 페이지당 최대: 1200자
+
+**다중 페이지 출력 형식:**
+```html
+<body style="margin: 0; overflow: hidden;">
+  <div style="padding: 60px; word-break: keep-all; height: {% if design_requirement.pdf_orientation == 'landscape' %}744{% else %}1073{% endif %}px; overflow: hidden; box-sizing: border-box; display: flex;">
+    <!-- 첫 번째 페이지 콘텐츠 (최대 1200자) -->
+  </div>
+</body>
+
+<body style="margin: 0; overflow: hidden;">
+  <div style="padding: 60px; word-break: keep-all; height: {% if design_requirement.pdf_orientation == 'landscape' %}744{% else %}1073{% endif %}px; overflow: hidden; box-sizing: border-box; display: flex;">
+    <!-- 두 번째 페이지 콘텐츠 (최대 1200자), 반드시 첫 번째 페이지 header와 동일한 header("계속", "Continue", "(2)" 와 같은 부가 텍스트 절대 금지)-->
+  </div>
+</body>
+
+<body style="margin: 0; overflow: hidden;">
+  <div style="padding: 60px; word-break: keep-all; height: {% if design_requirement.pdf_orientation == 'landscape' %}744{% else %}1073{% endif %}px; overflow: hidden; box-sizing: border-box; display: flex;">
+    <!-- 세 번째 페이지 콘텐츠 (필요시), 반드시 첫 번째 페이지 header와 동일한 header("계속", "Continue", "(3)" 와 같은 부가 텍스트 절대 금지)-->
+  </div>
+</body>
+```
+
+**페이지 분할 원칙:**
+- 섹션(h2, h3) 또는 문단 단위로 자연스럽게 분리
+- 문장 중간에서 절대 끊지 않음
+- 테이블 분할 시 헤더 행은 각 페이지에 반복
+- 각 페이지 최소 60% 이상 채움
+- 빈 페이지 생성 금지
+{% endif %}
+
+### 5. 콘텐츠 불변성 원칙
+
+- 제공된 HTML의 모든 텍스트 내용을 그대로 유지
+- 문장, 단어, 구두점을 추가/삭제/수정 금지
+- 텍스트 순서 변경 금지
+- 내용 요약이나 생략 금지
+
+**허용되는 것:**
+- HTML 구조 재배치 (의미 유지)
+- 인라인 CSS 스타일링
+- Flexbox/Grid 기반 시각적 그룹핑
+- 타이포그래피 조정
+- 장식 요소 추가 (내용 외)
+- HTML/CSS 기반 인포그래픽 생성
+- 제공된 이미지를 `<img>` 태그로 활용
+- 공간을 채우는 시각적 요소 추가
+
+### 6. Header 디자인 통일
+
+모든 페이지의 header는 다음 style을 따릅니다:
+```html
+<div style="display: flex; flex-direction: column; gap: 12px; border-bottom: 2px solid {{ design_requirement.primary_color }}; padding-bottom: 20px;">
+{% if section.section_key not in ["TABLE_OF_CONTENTS", "EXECUTIVE_SUMMARY", "COVER"] %}
+  <div style="display: flex; align-items: center; gap: 8px; font-size: 10pt; color: #6B7280; font-weight: 500;">
+    <span>첫번째 부모 경로</span>
+    <span style="color: #D1D5DB;">›</span>
+    <span>두번째 부모 경로</span>
+  </div>
+{% endif %}
+  <h1 style="font-size: 28pt; font-weight: 800; color: {{ design_requirement.primary_color }}; margin: 0; line-height: 1.2; letter-spacing: -0.02em;">{{ section.title }}</h1>
+  <h2 style="font-size: 14pt; font-weight: 600; color: #4A4A4A; margin: 0;">부제목("계속", "Continue", "(2)" 와 같이 이어짐을 의미하는 **부가 텍스트 절대 금지**)</h2>
+</div>
+```
+**모든 페이지의 header는 반드시 위 div, h1, h2 테그의 스타일대로 구현하세요. 특히 font-size, font-weight, color 는 반드시 제공된 값으로 적용되어야 합니다.**
+</core_rules>
+
+<content_metrics>
+## 콘텐츠 분석 결과
+
+- **글자 수**: {{ content_length }}자
+- **페이지 방향**: {{ design_requirement.pdf_orientation }}
+{% if content_length < 400 %}
+- **콘텐츠 분류**: 짧은 콘텐츠
+- **권장 레이아웃**: 1단 수직 배치, 큰 인포그래픽 허용
+- **페이지 수**: 1페이지
+{% elif content_length < 700 %}
+- **콘텐츠 분류**: 중간 콘텐츠
+- **권장 레이아웃**: 좌우 분할 또는 2단
+- **페이지 수**: 1페이지
+{% elif content_length < 1000 %}
+- **콘텐츠 분류**: 긴 콘텐츠
+- **권장 레이아웃**: 2-3단 멀티컬럼 필수
+- **페이지 수**: 1페이지 (최적화 적용)
+{% else %}
+- **콘텐츠 분류**: 다중 페이지 콘텐츠
+- **권장 레이아웃**: 멀티컬럼 + 다중 페이지
+- **필수 페이지 수**: {{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지
+- **페이지당 최대 글자 수**: 1200자
+{% endif %}
+- **이미지/차트/표 포함 시**: 멀티컬럼 필수
+</content_metrics>
+
+<design_system>
+## 디자인 시스템
+
+### 색상 시스템
+
+**브랜드 색상:**
+- Primary: {{ design_requirement.primary_color }} / Light: {{ design_requirement.primary_color }}20 / Lighter: {{ design_requirement.primary_color }}10
+- Secondary: {{ design_requirement.secondary_color }} / Light: {{ design_requirement.secondary_color }}20
+- Accent: {{ design_requirement.accent_color }} / Light: {{ design_requirement.accent_color }}30
+
+**중립 색상:**
+- Neutral 900 (본문): #1A1A1A
+- Neutral 700 (부제목): #4A4A4A
+- Neutral 500 (캡션): #808080
+- Neutral 300 (구분선): #CCCCCC
+- Neutral 100 (배경): #F5F5F5
+- White: #FFFFFF
+
+**비즈니스 보고서용 시맨틱 색상:**
+- 성과 상승/달성: #10B981 (Green)
+- 주의/경고: #F59E0B (Amber)
+- 미달/하락: #EF4444 (Red)
+- 정보/참고: #3B82F6 (Blue)
+
+**색상 사용 규칙:**
+- 페이지 타이틀: Primary (굵게)
+- 섹션 헤딩: Primary 또는 Neutral 900
+- 본문: Neutral 900
+- 캡션/주석: Neutral 500
+- 배경 박스: Primary Light 또는 Neutral 100
+- 강조 요소: Accent
+- 구분선: Neutral 300 또는 Primary Light
+- KPI 카드/차트: Primary + Secondary + Accent 조합
+- 증감 표시: 상승(Green), 하락(Red), 유지(Gray)
+
+### 타이포그래피 시스템
+
+{% if content_length < 400 %}
+**짧은 콘텐츠 ({{ content_length }}자):**
+```css
+/* 페이지 타이틀 */
+font-size: 24-28pt;
+font-weight: 700;
+color: {{ design_requirement.primary_color }};
+letter-spacing: -0.02em;
+line-height: 1.2;
+word-break: keep-all;
+
+/* 본문 */
+font-size: 10-11pt;
+font-weight: 400;
+color: #1A1A1A;
+line-height: 1.6-1.7;
+word-break: keep-all;
+
+/* 섹션 간격: 24-32px */
+```
+{% elif content_length < 700 %}
+**중간 콘텐츠 ({{ content_length }}자):**
+```css
+/* 페이지 타이틀 */
+font-size: 20-24pt;
+font-weight: 700;
+color: {{ design_requirement.primary_color }};
+letter-spacing: -0.02em;
+line-height: 1.2;
+word-break: keep-all;
+
+/* 본문 */
+font-size: 9.5-10.5pt;
+font-weight: 400;
+color: #1A1A1A;
+line-height: 1.6;
+word-break: keep-all;
+
+/* 섹션 간격: 16-20px */
+```
+{% else %}
+**긴 콘텐츠 ({{ content_length }}자):**
+```css
+/* 페이지 타이틀 */
+font-size: 16-20pt;
+font-weight: 700;
+color: {{ design_requirement.primary_color }};
+letter-spacing: -0.02em;
+line-height: 1.2;
+word-break: keep-all;
+
+/* 본문 */
+font-size: 9-9.5pt;
+font-weight: 400;
+color: #1A1A1A;
+line-height: 1.5;
+word-break: keep-all;
+
+/* 섹션 간격: 12-16px */
+```
+{% endif %}
+
+**추가 타이포그래피:**
+```css
+/* 주요 섹션 헤딩 */
+font-size: 14-18pt;
+font-weight: 600;
+color: {{ design_requirement.primary_color }};
+line-height: 1.3;
+
+/* 부 섹션 헤딩 */
+font-size: 12-14pt;
+font-weight: 600;
+color: #1A1A1A;
+line-height: 1.4;
+
+/* 소제목 */
+font-size: 10-12pt;
+font-weight: 500;
+color: #4A4A4A;
+line-height: 1.5;
+word-break: keep-all;
+
+/* 리드 텍스트 (인트로) */
+font-size: 11pt;
+font-weight: 400;
+color: #4A4A4A;
+line-height: 1.8;
+word-break: keep-all;
+
+/* 캡션/주석 */
+font-size: 8-9pt;
+font-weight: 400;
+color: #808080;
+line-height: 1.5;
+font-style: italic;
+
+/* 강조 텍스트 */
+font-weight: 600;
+color: {{ design_requirement.primary_color }};
+
+/* KPI 숫자 */
+font-size: 24-32pt;
+font-weight: 700;
+color: {{ design_requirement.primary_color }};
+```
+
+### 타이포그래피 조합 규칙
+
+- 제목과 본문의 크기 비율: 최소 2:1 유지
+- 섹션 간 시각적 휴식: 16-40px (콘텐츠 양에 따라)
+- 문단 간격: 10-16px (콘텐츠 양에 따라)
+- 리스트 항목 간격: 6-10px (콘텐츠 양에 따라)
+- **모든 텍스트 요소에 word-break: keep-all 필수 적용**
+- **여백은 컴팩트하게 유지하여 Safe Zone 확보**
+
+### 장식 요소 라이브러리
+
+**섹션 구분선:**
+```html
+<!-- 단순 라인 -->
+<div style="height: 1px; background: #CCCCCC;"></div>
+
+<!-- 그라데이션 라인 -->
+<div style="height: 2px; background: linear-gradient(to right, transparent, {{ design_requirement.primary_color }}60, transparent);"></div>
+
+<!-- 두꺼운 강조 라인 -->
+<div style="height: 3px; background: {{ design_requirement.primary_color }}; width: 60px;"></div>
+
+<!-- 점선 -->
+<div style="height: 1px; border-top: 2px dashed #CCCCCC;"></div>
+```
+
+**강조 박스:**
+```html
+<!-- 좌측 강조선 박스 -->
+<div style="border-left: 4px solid {{ design_requirement.accent_color }}; padding: 14px 16px; background: #F5F5F5; word-break: keep-all;">
+
+<!-- 그라데이션 배경 박스 -->
+<div style="background: linear-gradient(135deg, {{ design_requirement.primary_color }}08 0%, {{ design_requirement.accent_color }}08 100%); padding: 16px; border-radius: 8px; word-break: keep-all;">
+
+<!-- 테두리 강조 박스 -->
+<div style="border: 2px solid {{ design_requirement.primary_color }}40; padding: 16px; border-radius: 8px; background: white; word-break: keep-all;">
+
+<!-- 그림자 카드 -->
+<div style="background: white; padding: 20px; border-radius: 10px; box-shadow: 0 2px 10px rgba(0,0,0,0.08); word-break: keep-all;">
+
+<!-- 컬러 헤더 박스 -->
+<div>
+  <div style="background: {{ design_requirement.primary_color }}; color: white; padding: 10px 16px; border-radius: 8px 8px 0 0; font-weight: 600; word-break: keep-all;">제목</div>
+  <div style="border: 2px solid {{ design_requirement.primary_color }}40; border-top: none; padding: 16px; border-radius: 0 0 8px 8px; word-break: keep-all;">내용</div>
+</div>
+```
+
+**배경 장식 요소 (position: absolute 예외 허용):**
+```html
+<!-- z-index: -1 필수 - 콘텐츠 뒤에 배치 -->
+<div style="position: absolute; top: -50px; right: -50px; width: 200px; height: 200px; background: radial-gradient(circle, {{ design_requirement.primary_color }}08 0%, transparent 70%); border-radius: 50%; z-index: -1;"></div>
+```
+
+**아이콘/불릿 (Flexbox 사용):**
+```html
+<!-- 컬러 원형 불릿 -->
+<div style="display: flex; gap: 10px;">
+  <span style="display: inline-block; min-width: 6px; width: 6px; height: 6px; background: {{ design_requirement.primary_color }}; border-radius: 50%;"></span>
+  <span style="word-break: keep-all;">텍스트 내용</span>
+</div>
+
+<!-- 체크마크 스타일 -->
+<div style="display: flex; gap: 8px;">
+  <span style="display: flex; min-width: 18px; width: 18px; height: 18px; background: {{ design_requirement.accent_color }}; color: white; border-radius: 50%; font-size: 11px; font-weight: 700; align-items: center; justify-content: center;">✓</span>
+  <span style="word-break: keep-all;">텍스트 내용</span>
+</div>
+
+<!-- 숫자 배지 -->
+<div style="display: flex; gap: 10px;">
+  <span style="display: flex; min-width: 22px; height: 22px; background: {{ design_requirement.primary_color }}; color: white; border-radius: 11px; padding: 0 8px; font-size: 10px; font-weight: 600; align-items: center; justify-content: center;">01</span>
+  <span style="word-break: keep-all;">텍스트 내용</span>
+</div>
+```
+
+### 테이블 디자인 시스템
+
+**기본 테이블 스타일:**
+```html
+<table style="width: 100%; border-collapse: collapse; font-size: 9pt;">
+```
+
+**헤더 행 (thead):**
+```html
+<thead>
+  <tr>
+    <th style="background: #F9FAFB; padding: 10px; text-align: left; border-top: 2px solid {{ design_requirement.primary_color }}; border-bottom: 1px solid #E5E7EB; color: #374151; font-weight: 700;">구분</th>
+    <th style="background: #F9FAFB; padding: 10px; text-align: right; border-top: 2px solid {{ design_requirement.primary_color }}; border-bottom: 1px solid #E5E7EB; color: #374151; font-weight: 700;">수치 열</th>
+    <th style="background: #F9FAFB; padding: 10px; text-align: center; border-top: 2px solid {{ design_requirement.primary_color }}; border-bottom: 1px solid #E5E7EB; color: #374151; font-weight: 700;">증감</th>
+  </tr>
+</thead>
+```
+
+**본문 행 (tbody):**
+```html
+<tbody>
+  <tr>
+    <!-- 일반 텍스트 셀 -->
+    <td style="padding: 10px; border-bottom: 1px solid #E5E7EB; color: #1F2937;">항목명</td>
+    <!-- 숫자 셀 (우측 정렬) -->
+    <td style="padding: 10px; border-bottom: 1px solid #E5E7EB; color: #1F2937; text-align: right;">1,234</td>
+    <!-- 상승 값 셀 -->
+    <td style="padding: 10px; border-bottom: 1px solid #E5E7EB; color: #10B981; text-align: center; font-weight: 600;">▲ 15%</td>
+    <!-- 하락 값 셀 -->
+    <td style="padding: 10px; border-bottom: 1px solid #E5E7EB; color: #EF4444; text-align: center; font-weight: 600;">▼ 5%</td>
+    <!-- N/A 값 셀 -->
+    <td style="padding: 10px; border-bottom: 1px solid #E5E7EB; color: #9CA3AF; text-align: right;">N/A</td>
+  </tr>
+</tbody>
+```
+
+**카테고리/구분 열 (좌측 고정 열):**
+```html
+<td style="padding: 10px; border-bottom: 1px solid #E5E7EB; color: #1F2937; vertical-align: top; background: #F9FAFB; font-weight: 600;">
+  카테고리명<br>
+  <span style="font-weight: 400; font-size: 8pt; color: #6B7280;">(부가 설명)</span>
+</td>
+```
+
+**테이블 색상 규칙:**
+- 헤더 상단 강조선: `{{ design_requirement.primary_color }}` (2px)
+- 헤더 배경: `#F9FAFB`
+- 헤더 텍스트: `#374151` (font-weight: 700)
+- 본문 텍스트: `#1F2937`
+- 상승 값: `#10B981` (Green)
+- 하락 값: `#EF4444` (Red)
+- N/A 값: `#9CA3AF`
+- 카테고리 열 배경: `#F9FAFB`
+- 구분선: `#E5E7EB` (1px)
+
+**테이블 정렬 규칙:**
+- 텍스트 열: `text-align: left`
+- 숫자 열: `text-align: right`
+- 증감/상태 열: `text-align: center`
+- 다중 행 셀: `vertical-align: top`
+
+</design_system>
+
+<layout_decision>
+## 레이아웃 결정 가이드
+
+### 콘텐츠 분석 (Level 1: 기본 측정)
+
+분석 항목:
+- **전체 텍스트 길이**: {{ content_length }}자 (서버에서 계산됨)
+- 제목(h2, h3, h4) 개수 파악
+- 리스트 항목 수 계산
+- 이미지(`<img>`) 태그 존재 여부 및 개수
+- 테이블 존재 여부
+- 숫자/KPI 데이터 밀도 분석
+
+### 글자 수 기반 레이아웃 규칙
+
+**현재 콘텐츠: {{ content_length }}자**
+
+{% if content_length < 400 %}
+#### 짧은 콘텐츠 규칙 적용
+**레이아웃:** 1단 수직 배치 허용
+```html
+<div style="display: flex; flex-direction: column; gap: 24px; word-break: keep-all;">
+  <!-- 콘텐츠를 수직으로 배치, 여백으로 풍성하게 -->
+</div>
+```
+- 큰 인포그래픽/KPI 카드로 공간 채우기 (40-50% 허용)
+- 폰트 크기 크게, 여유로운 간격
+
+{% elif content_length < 700 %}
+#### 중간 콘텐츠 규칙 적용
+**레이아웃:** 좌우 분할 또는 2단
+{% if design_requirement.pdf_orientation == "landscape" %}
+```html
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; word-break: keep-all;">
+  <div><!-- 텍스트 --></div>
+  <div><!-- 차트 또는 KPI 카드 --></div>
+</div>
+```
+{% else %}
+```html
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 24px; word-break: keep-all;">
+  <p><!-- 텍스트 --></p>
+  <div><!-- 차트 또는 KPI 카드 --></div>
+</div>
+```
+{% endif %}
+- 인포그래픽은 전체의 30% 이하
+
+{% elif content_length < 1000 %}
+#### 긴 콘텐츠 규칙 적용
+**레이아웃:** 멀티컬럼 필수
+{% if design_requirement.pdf_orientation == "landscape" %}
+```html
+<div style="display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 16px; column-gap: 24px; word-break: keep-all;">
+  <!-- 3단 레이아웃 -->
+</div>
+```
+{% else %}
+```html
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; column-gap: 28px; word-break: keep-all;">
+  <!-- 2단 레이아웃 -->
+</div>
+```
+{% endif %}
+- 1단 레이아웃 절대 금지
+- 인포그래픽 15% 이하
+
+{% else %}
+#### 다중 페이지 규칙 적용
+**레이아웃:** 멀티컬럼 + {{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지 분할
+{% if design_requirement.pdf_orientation == "landscape" %}
+- 각 페이지 3단 멀티컬럼 필수
+{% else %}
+- 각 페이지 2-3단 멀티컬럼 필수
+{% endif %}
+- 페이지당 최대 1200자
+- 인포그래픽은 페이지당 15% 이하
+
+{% endif %}
+
+### 비즈니스 보고서 콘텐츠 타입별 패턴 선택
+
+**섹션명 패턴 인식:**
+| 키워드 | 권장 패턴 |
+|--------|----------|
+| 요약, 핵심성과, 하이라이트 | Executive Summary / KPI Dashboard |
+| 성과분석, 데이터분석, 실적 | Data Visualization + Table |
+| 추진과제, 업무계획, 일정 | Timeline / Action Items |
+| 이슈사항, 검토요청, 의사결정 | Highlight Box / Callout |
+| 비교, 대비, Before/After | Comparison Matrix |
+| 현황, 진행상황, 상태 | Progress Bar / Status Cards |
+
+**시각화 신호 감지:**
+| 신호 | 키워드 예시 | 생성할 인포그래픽 |
+|------|------------|------------------|
+| KPI/수치 | %, 상승, 하락, 달성률, ROI, ROAS | KPI 카드, 통계 하이라이트 |
+| 증감 | 전주 대비, 전월 대비, YoY, MoM | 비교표, 증감 지표 |
+| 진행상황 | 진행률, 완료, 미완료 | 프로그레스 바 |
+| 일정 | 요일, 주차, 마감일 | 타임라인, 일정표 |
+| 우선순위 | 긴급, 중요, 1순위, 2순위 | 우선순위 카드 |
+| 상태 | 승인, 대기, 반려, 진행중 | 상태 배지 |
+
+### 이미지 활용 원칙
+
+- `<img>` 태그가 있으면 반드시 레이아웃에 포함
+- 이미지가 있는 경우 좌우 분할 레이아웃 권장 (한쪽에 이미지, 반대쪽에 텍스트)
+{% if content_length >= 700 %}
+- **현재 긴 콘텐츠: 이미지는 전체의 15% 이하로 제한**
+{% elif content_length >= 400 %}
+- **현재 중간 콘텐츠: 이미지는 전체의 30% 이하로 제한**
+{% else %}
+- **현재 짧은 콘텐츠: 큰 이미지(40-50%) 허용**
+{% endif %}
+
+### 높이 초과 방지 대책
+
+높이가 부족할 것 같다면 순서대로 적용:
+1. 컬럼 수 증가: 2단 → 3단
+2. 폰트 축소: 본문 -0.5pt
+3. 줄간격 축소: line-height -0.1
+4. 여백 축소: 섹션 간격 -4px
+5. 인포그래픽 축소: 높이 -20%
+6. 이미지 축소 또는 **제거**
+
+**우선순위:** 컬럼 수 증가 > 폰트 축소 > 여백 축소 > 이미지 제거 {% if content_length >= 1000 %}> 페이지 분할{% endif %}
+
+### 공간 활용 테크닉
+
+**Flexbox로 분산 (짧은 콘텐츠):**
+```html
+<div style="display: flex; flex-direction: column; gap: 24px; word-break: keep-all;">
+  <!-- 상단부터 자연스럽게 배치 -->
+</div>
+```
+
+**Grid로 균등 분산:**
+```html
+<div style="display: grid; grid-template-rows: auto 1fr auto; word-break: keep-all; height: 100%;">
+  <header>상단</header>
+  <main>중단</main>
+  <footer>하단</footer>
+</div>
+```
+</layout_decision>
+
+<layout_patterns>
+## 비즈니스 보고서 레이아웃 패턴
+
+### Pattern 1: Executive Summary (경영진 요약)
+**사용:** 주간보고 요약, 핵심성과, 하이라이트
+```html
+<div style="display: flex; flex-direction: column; gap: 20px; word-break: keep-all;">
+  <div style="/* 핵심 메시지 박스 */"></div>
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+    <!-- KPI 카드 3개 -->
+  </div>
+  <div style="/* 주요 내용 요약 */"></div>
+</div>
+```
+
+### Pattern 2: KPI Dashboard (성과 대시보드)
+**사용:** 실적 현황, 성과 지표, 주간 KPI
+```html
+<div style="display: flex; flex-direction: column; gap: 20px; word-break: keep-all;">
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+    <!-- KPI 카드 그리드 -->
+  </div>
+  <div style="/* 상세 분석 */"></div>
+</div>
+```
+
+**높이 관리:**
+- 짧은 콘텐츠: 카드 120-140px, 여유 간격, 2×2 그리드
+- 중간 콘텐츠: 카드 100-120px, 보통 간격, 2×2 또는 3×2
+- 긴 콘텐츠: 카드 80-100px, 컴팩트 간격, 3×3 그리드
+
+### Pattern 3: Data Analysis (데이터 분석)
+**사용:** 캠페인 성과, 채널별 분석, ROI 분석
+```html
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 28px; word-break: keep-all;">
+  <div style="/* 차트/그래프 영역 */"></div>
+  <div style="/* 분석 텍스트 */"></div>
+</div>
+```
+
+### Pattern 4: Action Items (실행 계획)
+**사용:** 차주 계획, 추진과제, To-Do 리스트
+```html
+<div style="display: flex; flex-direction: column; gap: 16px; word-break: keep-all;">
+  <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+    <!-- 과제 카드들 -->
+  </div>
+</div>
+```
+
+### Pattern 5: Timeline Schedule (일정 타임라인)
+**사용:** 주간 일정, 업무 스케줄, 마일스톤
+```html
+<div style="display: flex; gap: 20px; align-items: flex-start; flex-wrap: wrap; word-break: keep-all;">
+  <div style="display: flex; flex-direction: column; align-items: center; gap: 6px;">
+    <p style="/* 요일/날짜 마커 */"></p>
+    <p style="word-break: keep-all;"><!-- 업무 내용 --></p>
+  </div>
+</div>
+```
+
+### Pattern 6: Comparison Matrix (비교 분석)
+**사용:** 전주 대비, Before/After, 옵션 비교
+```html
+<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; word-break: keep-all;">
+  <div style="border: 2px solid #CCCCCC; padding: 20px; border-radius: 12px;">
+    <p style="font-weight: 600; color: #808080; word-break: keep-all;">이전/As-Is</p>
+  </div>
+  <div style="border: 3px solid {{ design_requirement.primary_color }}; padding: 20px; border-radius: 12px; background: {{ design_requirement.primary_color }}05;">
+    <p style="font-weight: 600; color: {{ design_requirement.primary_color }}; word-break: keep-all;">이후/To-Be</p>
+  </div>
+</div>
+```
+
+### Pattern 7: Issue & Decision (이슈 및 의사결정)
+**사용:** 검토요청, 승인요청, 이슈사항
+```html
+<div style="display: flex; flex-direction: column; gap: 20px; word-break: keep-all;">
+  <div style="border-left: 4px solid #F59E0B; padding: 16px; background: #FFFBEB;">
+    <p style="font-weight: 600; color: #B45309;">의사결정 필요</p>
+    <!-- 요청 내용 -->
+  </div>
+</div>
+```
+
+### Pattern 8: Progress Report (진행 현황)
+**사용:** 프로젝트 현황, 진행률, 상태 보고
+```html
+<div style="display: flex; flex-direction: column; gap: 16px; word-break: keep-all;">
+  <div style="/* 프로그레스 바 */"></div>
+  <div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+    <!-- 상태 카드들: 완료/진행중/대기 -->
+  </div>
+</div>
+```
+
+### Pattern 9: Content Grid (콘텐츠 그리드)
+**사용:** 긴 텍스트, 상세 설명, 여러 항목 나열
+```html
+<div style="display: grid; grid-template-columns: 1fr 1fr; gap: 20px; column-gap: 28px; word-break: keep-all;">
+  <!-- 콘텐츠가 자동으로 2-3단으로 흐름 -->
+</div>
+```
+
+### Pattern 10: Meeting Notes (회의록)
+**사용:** 회의록, 논의사항, 결정사항
+```html
+<div style="display: flex; flex-direction: column; gap: 20px; word-break: keep-all;">
+  <div style="/* 회의 정보 헤더 */"></div>
+  <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 16px;">
+    <div style="/* 논의사항 */"></div>
+    <div style="/* 결정사항/액션아이템 */"></div>
+  </div>
+</div>
+```
+</layout_patterns>
+
+<infographic_templates>
+## 비즈니스 보고서 인포그래픽 템플릿
+
+### 인포그래픽 절대 금지 사항
+1. `position: absolute`로 텍스트나 그래프 바를 배치하지 마십시오
+2. 최상위 div와 이미지, 차트 등을 제외하고 고정 높이를 주지 마십시오
+3. 이미지를 `background-image`로 사용하지 마십시오
+4. 이미지 박스의 높이가 전체의 400px 이상 차지하지 않도록 하십시오
+
+### 인포그래픽 필수 사항
+1. 모든 배치는 Flexbox 또는 Grid 사용
+2. 모든 `<img>`에 `max-width: 100%; max-height: 400px;` 적용
+3. 모든 텍스트에 `word-break: keep-all` 적용
+4. `flex-wrap: wrap` 사용으로 넘침 방지
+5. 인포그래픽과 이미지의 총 높이가 Safe Zone의 60%를 넘지 않도록
+
+### 타입 1: KPI 카드 (성과 지표)
+```html
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px;">
+  <div style="padding: 24px; background: linear-gradient(135deg, {{ design_requirement.primary_color }}15 0%, {{ design_requirement.primary_color }}05 100%); border-radius: 16px; text-align: center; border: 1px solid {{ design_requirement.primary_color }}20;">
+    <p style="font-size: 10pt; color: #6B7280; word-break: keep-all;">클릭률 (CTR)</p>
+    <p style="font-size: 32pt; font-weight: 700; color: {{ design_requirement.primary_color }}; word-break: keep-all;">15%</p>
+    <p style="font-size: 9pt; color: #10B981; font-weight: 600;">▲ 전주 대비 상승</p>
+  </div>
+</div>
+```
+
+### 타입 2: 증감 지표 카드
+```html
+<div style="padding: 20px; background: white; border-radius: 12px; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+  <div style="display: flex; justify-content: space-between; align-items: center;">
+    <div>
+      <p style="font-size: 9pt; color: #6B7280; word-break: keep-all;">전환율</p>
+      <p style="font-size: 24pt; font-weight: 700; color: #1A1A1A;">3.2%</p>
+    </div>
+    <div style="padding: 8px 12px; background: #D1FAE5; border-radius: 8px;">
+      <p style="font-size: 11pt; font-weight: 600; color: #059669;">▲ +0.4%p</p>
+    </div>
+  </div>
+</div>
+```
+
+### 타입 3: 가로 바 차트 (진행률)
+```html
+<div style="display: flex; flex-direction: column; gap: 16px; padding: 24px; background: #F8F9FA; border-radius: 16px;">
+  <div style="width: 100%; box-sizing: border-box;">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <span style="font-size: 10pt; font-weight: 600; word-break: keep-all;">캠페인 A</span>
+      <span style="font-size: 11pt; font-weight: 700; color: {{ design_requirement.primary_color }};">85%</span>
+    </div>
+    <div style="width: 100%; background: #E0E0E0; border-radius: 8px; overflow: hidden; height: 12px; box-sizing: border-box;">
+      <div style="width: 85%; height: 100%; background: linear-gradient(90deg, {{ design_requirement.primary_color }}, {{ design_requirement.accent_color }}); border-radius: 8px;"></div>
+    </div>
+  </div>
+</div>
+```
+
+### 타입 4: 상태 배지 그리드
+```html
+<div style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px;">
+  <!-- 완료 -->
+  <div style="padding: 16px; background: #D1FAE5; border-radius: 10px; text-align: center;">
+    <p style="font-size: 20pt; font-weight: 700; color: #059669;">5</p>
+    <p style="font-size: 9pt; color: #065F46; word-break: keep-all;">완료</p>
+  </div>
+  <!-- 진행중 -->
+  <div style="padding: 16px; background: #DBEAFE; border-radius: 10px; text-align: center;">
+    <p style="font-size: 20pt; font-weight: 700; color: #2563EB;">3</p>
+    <p style="font-size: 9pt; color: #1E40AF; word-break: keep-all;">진행중</p>
+  </div>
+  <!-- 대기 -->
+  <div style="padding: 16px; background: #FEF3C7; border-radius: 10px; text-align: center;">
+    <p style="font-size: 20pt; font-weight: 700; color: #D97706;">2</p>
+    <p style="font-size: 9pt; color: #92400E; word-break: keep-all;">대기</p>
+  </div>
+</div>
+```
+
+### 타입 5: 주간 일정 타임라인
+```html
+<div style="display: flex; gap: 12px; padding: 20px 0; word-break: keep-all; flex-wrap: wrap;">
+  <div style="flex: 1; min-width: 100px; padding: 16px; background: {{ design_requirement.primary_color }}10; border-radius: 10px; border-top: 3px solid {{ design_requirement.primary_color }};">
+    <p style="font-size: 10pt; font-weight: 700; color: {{ design_requirement.primary_color }}; word-break: keep-all;">월</p>
+    <p style="font-size: 9pt; color: #4A4A4A; word-break: keep-all;">성과 분석</p>
+  </div>
+  <div style="flex: 1; min-width: 100px; padding: 16px; background: #F5F5F5; border-radius: 10px; border-top: 3px solid #CCCCCC;">
+    <p style="font-size: 10pt; font-weight: 700; color: #4A4A4A; word-break: keep-all;">화</p>
+    <p style="font-size: 9pt; color: #4A4A4A; word-break: keep-all;">기획/제작</p>
+  </div>
+</div>
+```
+
+### 타입 6: 의사결정 요청 박스
+```html
+<div style="border: 2px solid #F59E0B; border-radius: 12px; overflow: hidden;">
+  <div style="background: #FEF3C7; padding: 12px 16px; display: flex; align-items: center; gap: 8px;">
+    <span style="font-size: 12pt; font-weight: 700; color: #B45309;">검토 요청</span>
+  </div>
+  <div style="padding: 16px; background: white;">
+    <p style="font-size: 10pt; color: #1A1A1A; word-break: keep-all;">예산 재배정 승인 요청: 검색광고 → 디스플레이 광고</p>
+    <p style="font-size: 9pt; color: #6B7280; word-break: keep-all;">기대효과: CPC 10% 절감, 전환 50건 추가 예상</p>
+  </div>
+</div>
+```
+
+### 타입 7: 비교표 (전주 대비)
+```html
+<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; word-break: keep-all;">
+  <div style="border: 2px solid #CCCCCC; padding: 20px; border-radius: 12px;">
+    <p style="font-size: 13pt; font-weight: 600; color: #808080; word-break: keep-all;">전주 (W-1)</p>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <p style="font-size: 24pt; font-weight: 700; color: #808080;">2.8%</p>
+      <p style="font-size: 9pt; color: #6B7280;">전환율 (CVR)</p>
+    </div>
+  </div>
+  <div style="border: 3px solid {{ design_requirement.primary_color }}; padding: 20px; border-radius: 12px; background: {{ design_requirement.primary_color }}05;">
+    <p style="font-size: 13pt; font-weight: 600; color: {{ design_requirement.primary_color }}; word-break: keep-all;">금주 (Current)</p>
+    <div style="display: flex; flex-direction: column; gap: 8px;">
+      <p style="font-size: 24pt; font-weight: 700; color: {{ design_requirement.primary_color }};">3.2%</p>
+      <p style="font-size: 9pt; color: #059669; font-weight: 600;">▲ +0.4%p 상승</p>
+    </div>
+  </div>
+</div>
+```
+
+### 타입 8: 채널별 성과표
+```html
+<div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 16px;">
+  <div style="padding: 20px; background: white; border-radius: 12px; border-left: 4px solid #10B981; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <p style="font-size: 11pt; font-weight: 600; word-break: keep-all;">Meta</p>
+      <span style="padding: 4px 10px; background: #D1FAE5; border-radius: 12px; font-size: 9pt; font-weight: 600; color: #059669;">S등급</span>
+    </div>
+    <p style="font-size: 9pt; color: #6B7280; word-break: keep-all;">ROAS: High | 예산 105%</p>
+  </div>
+  <div style="padding: 20px; background: white; border-radius: 12px; border-left: 4px solid #3B82F6; box-shadow: 0 2px 8px rgba(0,0,0,0.06);">
+    <div style="display: flex; justify-content: space-between; align-items: center;">
+      <p style="font-size: 11pt; font-weight: 600; word-break: keep-all;">Google SA</p>
+      <span style="padding: 4px 10px; background: #DBEAFE; border-radius: 12px; font-size: 9pt; font-weight: 600; color: #2563EB;">A등급</span>
+    </div>
+    <p style="font-size: 9pt; color: #6B7280; word-break: keep-all;">ROAS: High | 예산 100%</p>
+  </div>
+</div>
+```
+
+### 타입 9: 하이라이트 박스 (핵심 메시지)
+```html
+<div style="padding: 32px; background: linear-gradient(135deg, {{ design_requirement.primary_color }} 0%, {{ design_requirement.secondary_color }} 100%); border-radius: 20px; color: white; text-align: center;">
+  <p style="font-size: 14pt; font-weight: 300; opacity: 0.9; word-break: keep-all;">금주 핵심 성과</p>
+  <p style="font-size: 36pt; font-weight: 700; word-break: keep-all;">CTR 15% 상승</p>
+  <p style="font-size: 11pt; font-weight: 400; opacity: 0.9; word-break: keep-all;">전환율 3.2% 달성</p>
+</div>
+```
+
+### 타입 10: 액션 아이템 카드
+```html
+<div style="display: flex; flex-direction: column; gap: 12px;">
+  <div style="display: flex; gap: 12px; padding: 16px; background: #F5F5F5; border-radius: 10px;">
+    <span style="display: flex; min-width: 24px; height: 24px; background: {{ design_requirement.primary_color }}; color: white; border-radius: 12px; font-size: 11px; font-weight: 600; align-items: center; justify-content: center;">1</span>
+    <div style="flex: 1;">
+      <p style="font-size: 10pt; font-weight: 600; word-break: keep-all;">고효율 소재 예산 증액</p>
+      <p style="font-size: 9pt; color: #6B7280; word-break: keep-all;">B안 소재 일일 예산 20% 증액</p>
+    </div>
+  </div>
+</div>
+```
+</infographic_templates>
+
+<execution_checklist>
+## 실행 체크리스트
+
+### Step 1: 콘텐츠 분석 (30초)
+- [ ] 텍스트 길이 확인: {{ content_length }}자
+- [ ] 페이지 방향 확인: {{ design_requirement.pdf_orientation }}
+- [ ] 제목(h2, h3, h4) 개수 파악
+- [ ] 리스트 항목 수 계산
+- [ ] 테이블 존재 여부
+- [ ] KPI/수치 데이터 밀도 분석
+- [ ] 섹션명으로 적합한 패턴 선택
+
+### Step 2: 레이아웃 결정 (30초)
+{% if content_length < 400 %}
+- [ ] 짧은 콘텐츠 → 1단 허용, 큰 KPI 카드 가능
+{% elif content_length < 700 %}
+- [ ] 중간 콘텐츠 → 좌우 분할 또는 2단
+{% elif content_length < 1000 %}
+- [ ] 긴 콘텐츠 → 멀티컬럼 필수 ({% if design_requirement.pdf_orientation == "landscape" %}3단{% else %}2단{% endif %})
+{% else %}
+- [ ] 다중 페이지 → {{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지 분할 필수
+{% endif %}
+- [ ] 테이블/차트 포함 시 → 멀티컬럼 필수
+
+### Step 3: 디자인 구현 (2-3분)
+- [ ] `<body style="margin: 0; overflow: hidden;">`로 시작
+- [ ] 최상위 div에 필수 속성 적용:
+  - `padding: 60px`
+  - `word-break: keep-all`
+  - `height: {% if design_requirement.pdf_orientation == 'landscape' %}744{% else %}1073{% endif %}px`
+  - `overflow: hidden`
+  - `box-sizing: border-box`
+  - `display: flex`
+- [ ] Flexbox/Grid로 레이아웃 구성
+- [ ] 원본 텍스트 100% 삽입
+- [ ] 인라인 CSS로 스타일링
+- [ ] `</body>`로 종료
+
+### Step 4: 최종 검증 (30초)
+
+**PdfPage 통합 검증:**
+- [ ] `<body>`로 시작, `</body>`로 종료
+- [ ] body에 width/height 속성 없음
+- [ ] body 스타일이 `margin: 0; overflow: hidden;` 만 있음
+- [ ] 최상위 div에 필수 속성 모두 있음
+- [ ] DOCTYPE/html/head/style 태그 없음
+- [ ] 코드 블록(```) 없음
+- [ ] 이모지, 이모티콘 없음
+- [ ] **`<div class="pdf-footer">` 없음**
+- [ ] Page 번호 직접 구현 안 함
+- [ ] HTML 주석 없음
+
+**레이아웃 검증:**
+- [ ] 최상위 div에 `height: 100%` 없음
+- [ ] 최상위 div에 `justify-content: center` 없음
+- [ ] `position: absolute` 텍스트/차트에 사용 안 함
+- [ ] `overflow-y: auto`, `overflow-x: auto` 없음
+
+**word-break 검증:**
+- [ ] 모든 제목 태그에 `word-break: keep-all` 적용
+- [ ] 모든 본문 텍스트에 `word-break: keep-all` 적용
+- [ ] 모든 리스트 항목에 `word-break: keep-all` 적용
+- [ ] 인포그래픽 내 텍스트에 `word-break: keep-all` 적용
+
+**필수 속성 검증:**
+- [ ] 모든 `<img>`에 `max-width: 100%; max-height: 400px;` 적용
+- [ ] Flexbox/Grid 레이아웃 사용
+- [ ] 주요 컨테이너에 `box-sizing: border-box` 적용
+- [ ] 가로 배치에 `flex-wrap: wrap` 적용
+
+**header 스타일 검증:**
+- [ ] 제공된 header 예시 스타일과 동일하게 적용
+
+**Safe Zone 검증:**
+- [ ] {% if design_requirement.pdf_orientation == "landscape" %}높이 720px 이하{% else %}높이 1073px 이하{% endif %}
+- [ ] 하단 여유 공간 확보
+- [ ] 인포그래픽+테이블 총 높이가 Safe Zone의 60% 이하
+{% if content_length >= 700 %}
+- [ ] 멀티 컬럼 적용됨 ({{ content_length }}자)
+{% endif %}
+
+{% if content_length >= 1000 %}
+**다중 페이지 검증:**
+- [ ] {{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지로 분할됨
+- [ ] 페이지당 최대 1200자
+- [ ] 각 body 태그 완전한 구조
+- [ ] 문장 중간 분할 없음
+- [ ] 빈 페이지 없음
+- [ ] 원본 콘텐츠 100% 포함
+- [ ] 각 페이지 최소 60% 이상 채움
+- [ ] 테이블 분할 시 헤더 반복
+{% endif %}
+
+**콘텐츠 검증:**
+- [ ] 원본 텍스트 100% 포함
+- [ ] 텍스트 추가/삭제/수정 없음
+- [ ] 텍스트 순서 변경 없음
+- [ ] 원본 `<img>` 태그 모두 포함
+- [ ] 이미지를 background-image로 사용하지 않음
+
+**테이블 검증:**
+- [ ] 모든 테이블에 `border-collapse: collapse; font-size: 9pt;` 적용
+- [ ] 헤더 상단에 `border-top: 2px solid {{ design_requirement.primary_color }}` 적용
+- [ ] 숫자 열 `text-align: right`, 증감 열 `text-align: center` 적용
+- [ ] 상승 값 `color: #10B981`, 하락 값 `color: #EF4444` 적용
+
+**디자인 품질 검증:**
+- [ ] 선택한 레이아웃 패턴이 콘텐츠에 적합
+- [ ] 타이포그래피 계층이 명확함
+- [ ] 브랜드 컬러가 적절히 적용됨
+- [ ] 인포그래픽이 Flexbox/Grid로 구성됨
+- [ ] 전문적인 비즈니스 보고서 스타일로 표현됨
+{% if content_length < 400 %}
+- [ ] 페이지가 비어보이지 않음 (짧은 콘텐츠)
+{% endif %}
+{% if content_length >= 700 %}
+- [ ] 페이지가 넘치지 않음 (긴 콘텐츠)
+{% endif %}
+
+### 문제 발견 시 수정 가이드
+
+모든 항목이 체크될 때까지 다음 순서로 수정:
+1. 해당 부분 즉시 수정
+2. `position: absolute` 발견 → Flexbox/Grid로 교체
+3. `height: 100%` 발견 → 제거하고 고정 height만 사용
+4. `<div class="pdf-footer">` 발견 → 완전히 제거
+5. 높이 초과 예상 → 멀티 컬럼 적용{% if content_length >= 1000 %} → 1200자 초과 시 페이지 분할{% endif %}
+6. `word-break: keep-all` 누락 → 모든 텍스트에 추가
+7. height 속성 확인 → 최상위 div에만 고정 height
+8. 다시 전체 검증
+9. **모든 항목 통과 후 출력**
+{% if content_length >= 1000 %}
+10. 페이지당 1200자 이하 확인
+{% endif %}
+</execution_checklist>
+
+<task_instruction>
+## 태스크 지시
+
+### 목표
+제공된 마크다운/HTML 콘텐츠를 분석하고, **{{ design_requirement.pdf_orientation }} 방향의 A4 페이지 {% if content_length >= 1000 %}{{ ((content_length / 1200) | round(0, 'ceil')) | int }}장{% else %}1장{% endif %}**에 전문적으로 디자인된 비즈니스 보고서를 생성하십시오.
+
+### 입력 데이터
+
+**디자인 사양:**
+- Primary Color: {{ design_requirement.primary_color }}
+- Secondary Color: {{ design_requirement.secondary_color }}
+- Accent Color: {{ design_requirement.accent_color }}
+- PDF Orientation: {{ design_requirement.pdf_orientation }}
+
+**콘텐츠 정보:**
+- Content Length: {{ content_length }}자
+{% if content_length < 400 %}
+- Category: 짧은 콘텐츠 (1단 허용)
+{% elif content_length < 700 %}
+- Category: 중간 콘텐츠 (좌우 분할)
+{% elif content_length < 1000 %}
+- Category: 긴 콘텐츠 (멀티컬럼 필수)
+{% else %}
+- Category: 다중 페이지 ({{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지)
+{% endif %}
+
+{% if section.section_key not in ["TABLE_OF_CONTENTS", "EXECUTIVE_SUMMARY", "COVER"] %}
+**부모 목차 경로:**
+{{ section.parent_path }}
+{% endif %}
+
+**섹션 타이틀:**
+{{ section.title }}
+
+**디자인할 콘텐츠:**
+{{ section.content }}
+
+### 실행 순서
+
+1. **콘텐츠 분석** (30초) → `content_metrics` 참조
+2. **레이아웃 결정** (30초) → `layout_decision` 규칙 적용
+3. **패턴 선택** → `layout_patterns`에서 최적 패턴 선택
+4. **디자인 구현** (2-3분) → `core_rules` 준수, `design_system` 적용
+5. **인포그래픽 추가** (필요시) → `infographic_templates` 활용
+6. **최종 검증** (30초) → `execution_checklist` 모든 항목 확인
+7. **출력** (즉시) → `<body>`부터 `</body>`까지만 출력
+
+{% if section.section_key == "DATA_TABLE" or section.section_title == "Appendix" %}
+### 데이터 테이블 특별 지침
+- 제공된 테이블 데이터를 기반으로 깔끔한 비즈니스 톤의 테이블 디자인
+- **반드시 `design_system`의 테이블 디자인 시스템을 준수**
+- 결과는 HTML table 태그로 구성
+- 헤더 상단에 Primary Color 강조선 필수
+- 숫자는 우측 정렬, 증감은 중앙 정렬, 텍스트는 좌측 정렬
+- 상승 값은 Green(#10B981), 하락 값은 Red(#EF4444)으로 표시
+{% if content_length >= 1000 %}
+- 테이블이 여러 페이지에 걸칠 경우 각 페이지 상단에 헤더 행 반복
+{% endif %}
+{% endif %}
+
+### 출력 형식
+
+코드 블록 없이 순수 HTML만 출력:
+- 첫 줄: `<body style="margin: 0; overflow: hidden;">`
+- 마지막 줄: `</body>`
+
+### 핵심 주의사항 (Critical Reminders)
+
+**구조 관련:**
+- `<body style="margin: 0; overflow: hidden;">`로 시작, `</body>`로 종료
+- `<!DOCTYPE html>`, `<html>`, `<head>`, `<style>` 태그 절대 금지
+- 코드 블록(```)으로 감싸지 마십시오
+- `<div class="pdf-footer">` 또는 Page 번호 직접 구현 절대 금지
+- 이모지를 사용하지 마십시오
+- Footer 관련 디자인을 생성하지 마십시오
+- 모든 페이지의 header는 반드시 제공된 스타일대로 구현하세요
+
+**레이아웃 관련:**
+- `position: absolute`는 텍스트/차트에 절대 사용 금지 (Flexbox/Grid 사용)
+- 최상위 div에 `height: 100%` 절대 금지
+- 최상위 div에 `justify-content: center` 절대 금지 (콘텐츠는 상단부터)
+- 최상위 div 외 나머지 div에는 `height: auto;` 사용
+- `overflow-y: auto`, `overflow-x: auto` 절대 금지 (스크롤 금지)
+- `margin`, `margin-top`, `margin-bottom` 사용 금지 (flex + gap 사용)
+
+**텍스트 관련:**
+- 모든 텍스트에 `word-break: keep-all` 필수 적용
+- 숫자, 문자, 텍스트에 `<div>` 태그 사용 금지 (`<p>`, `<span>`, `<h1>`~`<h6>` 사용)
+
+**비즈니스 보고서 스타일:**
+- 깔끔하고 전문적인 비즈니스 문서 톤 유지
+- KPI, 성과 지표는 시각적으로 강조
+- 증감 데이터는 색상으로 구분 (상승: Green, 하락: Red)
+- 의사결정 요청 사항은 강조 박스로 표시
+
+**Safe Zone 관련:**
+- Portrait: 높이 1073px 이하 타겟
+- Landscape: 높이 720px 이하 타겟
+{% if content_length >= 1000 %}
+- {{ ((content_length / 1200) | round(0, 'ceil')) | int }}페이지 분할 필수
+- 페이지당 최대 1200자
+- 페이지가 분할될 때는 반드시 첫 번째 페이지 header와 동일한 header("계속", "Continue", "(2)", "(3)" 와 같은 이어짐을 나타내는 부가 텍스트 **절대 금지**)
+{% else %}
+- A4 1장에 모든 콘텐츠 포함, 짤리는 내용 절대 금지
+{% endif %}
+
+{% if content_length >= 700 %}
+**긴 콘텐츠 ({{ content_length }}자):**
+- 멀티컬럼 필수 ({% if design_requirement.pdf_orientation == "landscape" %}3단{% else %}2단{% endif %})
+- 인포그래픽 15% 이하
+{% endif %}
+
+</task_instruction>
