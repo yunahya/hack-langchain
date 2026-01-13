@@ -45,10 +45,12 @@ class ReportInput(TypedDict, total=False):
     key_message: str
     """Core message or keywords to emphasize."""
 
-    company_info: str
-    """Company/team name and industry context."""
+    company_name: str
+    """기업명 또는 조직명."""
 
     # Optional fields (for quality enhancement)
+    company_info: NotRequired[str]
+    """기업 설명 및 추가 정보."""
     tone: NotRequired[str]
     """Writing style: 격식체/반말, 간결함/상세함."""
 

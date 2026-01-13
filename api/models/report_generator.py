@@ -55,10 +55,15 @@ class ReportGeneratorRequest(BaseModel):
         description="Core message or keywords to emphasize",
         examples=["캠페인 성과 및 다음 주 계획", "예산 승인 필요"],
     )
-    company_info: str = Field(
+    company_name: str = Field(
         ...,
-        description="Company/team name and industry context",
-        examples=["ABC 주식회사 마케팅팀", "XYZ 스타트업 개발팀"],
+        description="기업명 또는 조직명",
+        examples=["ABC 주식회사", "XYZ 스타트업"],
+    )
+    company_info: Optional[str] = Field(
+        default=None,
+        description="기업 설명 및 추가 정보",
+        examples=["마케팅팀, IT 산업", "개발팀, 핀테크 스타트업"],
     )
     tone: Optional[str] = Field(
         default=None,
@@ -97,7 +102,8 @@ class ReportGeneratorRequest(BaseModel):
                     "audience": "직속 상사",
                     "topic": "마케팅팀 주간업무보고",
                     "key_message": "캠페인 성과 및 다음 주 계획",
-                    "company_info": "ABC 주식회사 마케팅팀",
+                    "company_name": "ABC 주식회사",
+                    "company_info": "마케팅팀, IT 산업",
                     "page_count": 3,
                     "config": {
                         "model": "google/gemini-2.0-flash",

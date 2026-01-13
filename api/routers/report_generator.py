@@ -14,9 +14,13 @@ from api.models.report_generator import (
     TocItemResponse,
     PageContentResponse,
 )
-from api.services.workflow_runner import invoke_workflow_sync
-from report_generator_langgraph import graph
-from report_generator_langgraph.state import ReportState, ReportInput
+from api.services.workflow_runner import invoke_workflow_async
+from report_draft_generator import graph
+from report_draft_generator.state import (
+    DraftGeneratorState,
+    ReportInput,
+    DEFAULT_DESIGN_REQUIREMENT,
+)
 
 
 logger = logging.getLogger(__name__)
@@ -48,10 +52,12 @@ async def generate_report(request: ReportGeneratorRequest) -> ReportGeneratorRes
         "audience": request.audience,
         "topic": request.topic,
         "key_message": request.key_message,
-        "company_info": request.company_info,
+        "company_name": request.company_name,
     }
 
     # Add optional fields if provided
+    if request.company_info:
+        user_input["company_info"] = request.company_info
     if request.tone:
         user_input["tone"] = request.tone
     if request.page_count:
@@ -64,12 +70,15 @@ async def generate_report(request: ReportGeneratorRequest) -> ReportGeneratorRes
         user_input["additional_data"] = request.additional_data
 
     # Build initial state
-    initial_state: ReportState = {
+    initial_state: DraftGeneratorState = {
         "input": user_input,
         "toc": [],
-        "pages": [],
-        "final_report": "",
+        "sections": [],
+        "design_requirement": DEFAULT_DESIGN_REQUIREMENT,
+        "designed_pages": [],
+        "final_html": None,
         "status": "pending",
+        "errors": [],
     }
 
     # Build configurable options
@@ -84,7 +93,7 @@ async def generate_report(request: ReportGeneratorRequest) -> ReportGeneratorRes
     try:
         logger.info(f"Generating report: {request.topic}")
 
-        result, execution_time_ms = invoke_workflow_sync(
+        result, execution_time_ms = await invoke_workflow_async(
             graph=graph,
             initial_state=initial_state,
             configurable=configurable,
@@ -92,7 +101,7 @@ async def generate_report(request: ReportGeneratorRequest) -> ReportGeneratorRes
 
         logger.info(
             f"Report generation completed: {request.topic} "
-            f"with {len(result['pages'])} pages in {execution_time_ms}ms"
+            f"with {len(result['sections'])} sections in {execution_time_ms}ms"
         )
 
         # Convert TOC items to response format
@@ -106,19 +115,25 @@ async def generate_report(request: ReportGeneratorRequest) -> ReportGeneratorRes
             for item in result["toc"]
         ]
 
-        # Convert pages to response format
+        # Convert sections to pages response format (backward compatibility)
         pages_response = [
             PageContentResponse(
-                page_id=page["page_id"],
-                title=page["title"],
-                content=page["content"],
-                order=page["order"],
+                page_id=section["page_id"],
+                title=section["title"],
+                content=section["content"],
+                order=section["order"],
             )
-            for page in result["pages"]
+            for section in sorted(result["sections"], key=lambda x: x["order"])
         ]
 
+        # Build final_report from final_html or combine section contents
+        final_report = result.get("final_html") or "\n\n".join(
+            f"## {section['title']}\n\n{section['content']}"
+            for section in sorted(result["sections"], key=lambda x: x["order"])
+        )
+
         return ReportGeneratorResponse(
-            final_report=result["final_report"],
+            final_report=final_report,
             toc=toc_response,
             pages=pages_response,
             status=result["status"],
